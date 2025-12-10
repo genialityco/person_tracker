@@ -1,0 +1,27 @@
+﻿# Configuración de Grafana Datasources
+apiVersion: 1
+
+datasources:
+  # ClickHouse datasource
+  - name: ClickHouse
+    type: grafana-clickhouse-datasource
+    access: proxy
+    url: http://clickhouse:8123
+    isDefault: true
+    jsonData:
+      defaultDatabase: analytics
+      protocol: http
+      server: clickhouse
+      port: 8123
+      username: default
+    secureJsonData:
+      password: clickhouse123
+    editable: true
+
+  # MongoDB datasource (opcional - para queries específicas)
+  - name: MongoDB
+    type: grafana-mongodb-datasource
+    access: proxy
+    url: mongodb://admin:admin123@mongodb:27017
+    database: person_tracking
+    editable: true

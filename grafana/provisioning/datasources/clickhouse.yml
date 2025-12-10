@@ -1,0 +1,18 @@
+apiVersion: 1
+
+datasources:
+  - name: ClickHouse
+    type: grafana-clickhouse-datasource
+    access: proxy
+    url: http://clickhouse:8123
+    basicAuth: true
+    basicAuthUser: default
+    jsonData:
+      defaultDatabase: analytics
+    secureJsonData:
+      basicAuthPassword: clickhouse123
+    uid: clickhouse
+    # Do not set as default to avoid conflicts with existing org defaults.
+    # If you want this datasource to be default, set `isDefault: true` manually
+    # in Grafana UI after confirming provisioning succeeded.
+    editable: true

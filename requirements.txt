@@ -1,0 +1,45 @@
+# Edge Processing
+ultralytics>=8.0.0
+# pyrealsense2>=2.54.1  # Opcional - solo si tienes cámara RealSense
+opencv-python>=4.8.0
+numpy>=1.24.0
+Pillow>=10.0.0
+
+# Tracking
+filterpy>=1.4.5
+scipy>=1.11.0
+
+# Deep Learning Acceleration
+onnxruntime-gpu>=1.16.0  # TensorRT/OpenVINO backend
+# openvino>=2023.0.0  # Uncomment if using OpenVINO
+
+# API & Server
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.4.0
+pydantic-settings>=2.0.0
+python-multipart>=0.0.6
+
+# Database Clients
+pymongo>=4.5.0
+motor>=3.3.0  # Async MongoDB driver
+clickhouse-connect>=0.6.0
+
+# Kafka
+confluent-kafka>=2.3.0
+aiokafka>=0.9.0
+
+# Utilities
+python-dotenv>=1.0.0
+loguru>=0.7.0
+httpx>=0.25.0
+tenacity>=8.2.0
+
+# Monitoring & Metrics
+prometheus-client>=0.18.0
+
+# Testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+httpx>=0.25.0  # For testing FastAPI

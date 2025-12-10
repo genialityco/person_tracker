@@ -1,0 +1,108 @@
+version: '3.8'
+
+services:
+  # MongoDB - Fuente de verdad
+  mongodb:
+    image: mongo:7.0
+    container_name: person_tracker_mongo
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin123
+      MONGO_INITDB_DATABASE: person_tracking
+    volumes:
+      - mongo_data:/data/db
+      - ./db/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+    networks:
+      - tracker_network
+
+  # Zookeeper - Required for Kafka
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: person_tracker_zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - tracker_network
+
+  # Kafka - Event Streaming
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: person_tracker_kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    networks:
+      - tracker_network
+
+  # ClickHouse - OLAP Analytics
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.8
+    container_name: person_tracker_clickhouse
+    ports:
+      - "8123:8123"  # HTTP
+      - "9000:9000"  # Native
+    environment:
+      CLICKHOUSE_DB: analytics
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: clickhouse123
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ./db/init-clickhouse.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    networks:
+      - tracker_network
+
+  # Grafana - Visualization
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: person_tracker_grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin123
+      GF_INSTALL_PLUGINS: grafana-clickhouse-datasource
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - clickhouse
+    networks:
+      - tracker_network
+
+  # FastAPI - API Server (opcional, puede correr local)
+  # api:
+  #   build: .
+  #   container_name: person_tracker_api
+  #   ports:
+  #     - "8000:8000"
+  #   environment:
+  #     - MONGO_URI=mongodb://admin:admin123@mongodb:27017
+  #     - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+  #   depends_on:
+  #     - mongodb
+  #     - kafka
+  #   networks:
+  #     - tracker_network
+
+volumes:
+  mongo_data:
+  clickhouse_data:
+  grafana_data:
+
+networks:
+  tracker_network:
+    driver: bridge
