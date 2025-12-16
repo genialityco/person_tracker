@@ -3,7 +3,7 @@ Session Manager - Gestiona sesiones anónimas temporales.
 Los IDs locales NUNCA salen del Edge, se destruyen después del timeout.
 """
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Optional
 import numpy as np
 from config.settings import settings
@@ -27,19 +27,23 @@ class Session:
         self.total_frames = 0
         self.attention_frames = 0
         self.distances = []  # Distancias registradas en cm
+        self.positions_x = []  # Posiciones X del centro del bbox
+        self.positions_y = []  # Posiciones Y del centro del bbox
         
         # Estimaciones demográficas (opcionales)
         self.age_estimates = []
         self.gender_estimates = []
         self.demographics_estimated = False  # Flag para saber si ya se estimó
     
-    def update(self, is_looking: bool, distance_cm: Optional[float] = None):
+    def update(self, is_looking: bool, distance_cm: Optional[float] = None, position_x: Optional[int] = None, position_y: Optional[int] = None):
         """
         Actualiza la sesión con una nueva observación.
         
         Args:
             is_looking: True si la persona está mirando la pantalla
             distance_cm: Distancia a la pantalla en cm (opcional)
+            position_x: Coordenada X del centro del bbox (opcional)
+            position_y: Coordenada Y del centro del bbox (opcional)
         """
         self.last_seen = time.time()
         self.total_frames += 1
@@ -49,6 +53,12 @@ class Session:
         
         if distance_cm is not None:
             self.distances.append(distance_cm)
+        
+        if position_x is not None:
+            self.positions_x.append(position_x)
+        
+        if position_y is not None:
+            self.positions_y.append(position_y)
     
     def add_demographic_estimate(self, age_group: str, gender: str):
         """
@@ -98,6 +108,23 @@ class Session:
             return 0
         return int(np.mean(self.distances))
     
+    def get_predominant_position(self) -> dict:
+        """
+        Calcula la posición predominante (mediana) durante la sesión.
+        Usa mediana en lugar de media para ser más robusto a outliers.
+        
+        Returns:
+            dict: {"x": int, "y": int} o {"x": 0, "y": 0} si no hay datos
+        """
+        if not self.positions_x or not self.positions_y:
+            return {"x": 0, "y": 0}
+        
+        # Usar mediana para ser robusto a outliers
+        median_x = int(np.median(self.positions_x))
+        median_y = int(np.median(self.positions_y))
+        
+        return {"x": median_x, "y": median_y}
+    
     def get_most_common_age_group(self) -> str:
         """Retorna el grupo de edad más común."""
         if not self.age_estimates:
@@ -125,9 +152,10 @@ class Session:
         """
         return {
             "device_id": device_id,
-            "start_time": datetime.fromtimestamp(self.start_time).isoformat() + "Z",
+            "start_time": datetime.fromtimestamp(self.start_time, tz=timezone.utc).isoformat().replace('+00:00', 'Z'),
             "duration_seconds": self.get_duration_seconds(),
             "attention_seconds": self.get_attention_seconds(),
+            "coordinates": self.get_predominant_position(),
             "demographics": {
                 "age_group": self.get_most_common_age_group(),
                 "gender_estimation": self.get_most_common_gender(),
@@ -162,6 +190,8 @@ class SessionManager:
         track_id: int,
         is_looking: bool,
         distance_cm: Optional[float] = None,
+        position_x: Optional[int] = None,
+        position_y: Optional[int] = None,
         age_group: Optional[str] = None,
         gender: Optional[str] = None
     ):
@@ -172,6 +202,8 @@ class SessionManager:
             track_id: ID del track (local, temporal)
             is_looking: ¿Está mirando la pantalla?
             distance_cm: Distancia en cm
+            position_x: Coordenada X del centro del bbox
+            position_y: Coordenada Y del centro del bbox
             age_group: Grupo de edad estimado
             gender: Género estimado
         """
@@ -182,7 +214,7 @@ class SessionManager:
         
         # Actualizar sesión existente
         session = self.sessions[track_id]
-        session.update(is_looking, distance_cm)
+        session.update(is_looking, distance_cm, position_x, position_y)
         
         if age_group or gender:
             session.add_demographic_estimate(age_group, gender)

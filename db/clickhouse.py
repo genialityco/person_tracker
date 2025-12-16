@@ -102,6 +102,8 @@ class ClickHouseClient:
                 session_data['device_id'],
                 session_data['duration_seconds'],
                 session_data['attention_seconds'],
+                session_data.get('coordinates', {}).get('x', 0),
+                session_data.get('coordinates', {}).get('y', 0),
                 session_data['demographics']['age_group'],
                 session_data['demographics']['gender_estimation'],
                 session_data['demographics']['distance_cm'],
@@ -115,7 +117,7 @@ class ClickHouseClient:
                 data,
                 column_names=[
                     'session_id', 'start_time', 'device_id', 'duration_seconds',
-                    'attention_seconds', 'age_group', 'gender',
+                    'attention_seconds', 'coordinate_x', 'coordinate_y', 'age_group', 'gender',
                     'distance_cm', 'firmware_version', 'model_version',
                     'tracker_version'
                 ]

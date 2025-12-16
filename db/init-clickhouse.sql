@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS sessions_raw_ch (
     device_id UInt32,
     duration_seconds Int32,
     attention_seconds Float32,
+    coordinate_x Int32,
+    coordinate_y Int32,
     age_group String,
     gender_estimation String,
     distance_cm Int32,

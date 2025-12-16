@@ -6,6 +6,12 @@ from typing import Optional
 from pydantic import BaseModel, Field, field_validator
 
 
+class Coordinates(BaseModel):
+    """Posición predominante de la persona durante la sesión."""
+    x: int = Field(..., ge=0, description="Coordenada X (centro del bbox, mediana)")
+    y: int = Field(..., ge=0, description="Coordenada Y (centro del bbox, mediana)")
+
+
 class Demographics(BaseModel):
     """Datos demográficos estimados (no biométricos)."""
     age_group: str = Field(..., description="Rango de edad: '18-24', '25-34', '35-44', '45-54', '55+'")
@@ -45,6 +51,7 @@ class SessionPayload(BaseModel):
     start_time: datetime = Field(..., description="Timestamp de inicio de sesión (UTC)")
     duration_seconds: int = Field(..., ge=0, description="Duración total de la sesión en segundos")
     attention_seconds: float = Field(..., ge=0.0, description="Tiempo mirando la pantalla")
+    coordinates: Coordinates = Field(..., description="Posición predominante durante la sesión")
     demographics: Demographics = Field(..., description="Datos demográficos estimados")
     meta: Meta = Field(..., description="Metadata técnica")
     
@@ -69,6 +76,10 @@ class SessionPayload(BaseModel):
                 "start_time": "2025-12-09T14:30:00Z",
                 "duration_seconds": 14,
                 "attention_seconds": 9.4,
+                "coordinates": {
+                    "x": 640,
+                    "y": 360
+                },
                 "demographics": {
                     "age_group": "25-34",
                     "gender_estimation": "male",

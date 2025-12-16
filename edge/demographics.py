@@ -1,21 +1,22 @@
 """
 Demographics Estimator - Estimación de edad y género sin biometría.
-Usa modelos ligeros para clasificación sin almacenar características faciales.
+Usa YOLOv8-face para detección facial y modelos genderage para clasificación.
 """
 import cv2
 import numpy as np
 from pathlib import Path
+from ultralytics import YOLO
 from utils.logger import log
 
 
 class DemographicsEstimator:
-    """Estimador de demografía usando modelos pre-entrenados de OpenCV."""
+    """Estimador de demografía usando YOLOv8-face + modelos de edad/género."""
     
     def __init__(self):
-        """Inicializa los modelos de edad y género."""
+        """Inicializa los modelos de detección facial y clasificación."""
+        self.face_detector = None
         self.age_net = None
         self.gender_net = None
-        self.face_net = None
         self.model_loaded = False
         
         # Definiciones de edad y género
@@ -37,36 +38,44 @@ class DemographicsEstimator:
         self._load_models()
     
     def _load_models(self):
-        """Carga los modelos de edad, género y detección facial."""
+        """Carga YOLOv8-face y modelos de edad/género."""
         try:
             models_dir = Path("models/demographics")
             models_dir.mkdir(parents=True, exist_ok=True)
             
             # Paths a los modelos
-            face_proto = models_dir / "opencv_face_detector.pbtxt"
-            face_model = models_dir / "opencv_face_detector_uint8.pb"
+            yoloface_path = models_dir / "yoloface.pt"
             age_proto = models_dir / "age_deploy.prototxt"
             age_model = models_dir / "age_net.caffemodel"
             gender_proto = models_dir / "gender_deploy.prototxt"
             gender_model = models_dir / "gender_net.caffemodel"
             
-            # Verificar si los modelos existen
-            if not all([face_proto.exists(), face_model.exists(), 
-                       age_proto.exists(), age_model.exists(),
-                       gender_proto.exists(), gender_model.exists()]):
-                log.warning("⚠ Modelos de demografía no encontrados")
-                log.info("💡 Descarga los modelos con: python scripts/download_demographic_models.py")
-                log.info("💡 O el sistema usará estimación por defecto")
+            # Verificar YOLOv8-face
+            if not yoloface_path.exists():
+                log.warning("⚠ Modelo YOLOv8-face no encontrado en models/demographics/yoloface.pt")
+                log.info("💡 El sistema usará estimación por defecto")
                 self.model_loaded = False
                 return
             
-            # Cargar modelos
-            self.face_net = cv2.dnn.readNet(str(face_model), str(face_proto))
+            # Verificar modelos de clasificación
+            if not all([age_proto.exists(), age_model.exists(),
+                       gender_proto.exists(), gender_model.exists()]):
+                log.warning("⚠ Modelos de edad/género no encontrados")
+                log.info("💡 Descarga los modelos con: python scripts/download_demographic_models.py")
+                log.info("💡 El sistema usará estimación por defecto")
+                self.model_loaded = False
+                return
+            
+            # Cargar YOLOv8-face
+            self.face_detector = YOLO(str(yoloface_path))
+            log.info("✓ YOLOv8-face cargado")
+            
+            # Cargar modelos de clasificación
             self.age_net = cv2.dnn.readNet(str(age_model), str(age_proto))
             self.gender_net = cv2.dnn.readNet(str(gender_model), str(gender_proto))
             
             self.model_loaded = True
-            log.info("✓ Modelos de demografía cargados")
+            log.info("✓ Modelos de demografía cargados (YOLOv8-face + genderage)")
             
         except Exception as e:
             log.warning(f"⚠ Error cargando modelos de demografía: {e}")
@@ -75,14 +84,14 @@ class DemographicsEstimator:
     
     def estimate(self, frame: np.ndarray, bbox: tuple) -> tuple:
         """
-        Estima edad y género de una persona.
+        Estima edad y género de una persona usando YOLOv8-face.
         
         Args:
             frame: Frame RGB completo
-            bbox: Bounding box (x1, y1, x2, y2)
+            bbox: Bounding box de la persona (x1, y1, x2, y2)
             
         Returns:
-            tuple: (age_group, gender) ejemplo: ('adult', 'male')
+            tuple: (age_group, gender) ejemplo: ('25-34', 'male')
         """
         if not self.model_loaded:
             return self._estimate_by_bbox_size(bbox)
@@ -90,16 +99,38 @@ class DemographicsEstimator:
         try:
             x1, y1, x2, y2 = map(int, bbox)
             
-            # Extraer región de interés (ROI)
+            # Extraer región de interés (ROI) - torso superior
             roi = frame[y1:y2, x1:x2]
             
             if roi.size == 0:
                 return "unknown", "unknown"
             
-            # Detectar cara en el ROI
-            blob = cv2.dnn.blobFromImage(roi, 1.0, (227, 227), 
-                                         (78.4263377603, 87.7689143744, 114.895847746),
-                                         swapRB=False)
+            # Detectar caras con YOLOv8-face en el ROI
+            results = self.face_detector(roi, verbose=False, conf=0.5)
+            
+            if len(results) == 0 or len(results[0].boxes) == 0:
+                log.debug("No se detectaron caras en el ROI")
+                return "unknown", "unknown"
+            
+            # Tomar la cara con mayor confianza
+            boxes = results[0].boxes
+            confidences = boxes.conf.cpu().numpy()
+            best_idx = np.argmax(confidences)
+            face_box = boxes.xyxy[best_idx].cpu().numpy().astype(int)
+            
+            # Extraer región de la cara
+            fx1, fy1, fx2, fy2 = face_box
+            face_roi = roi[fy1:fy2, fx1:fx2]
+            
+            if face_roi.size == 0:
+                return "unknown", "unknown"
+            
+            # Preparar blob para clasificación (modelos Caffe esperan 227x227)
+            blob = cv2.dnn.blobFromImage(
+                face_roi, 1.0, (227, 227),
+                (78.4263377603, 87.7689143744, 114.895847746),
+                swapRB=False
+            )
             
             # Predecir género
             self.gender_net.setInput(blob)

@@ -1,9 +1,12 @@
 # Edge Processing
 ultralytics>=8.0.0
 # pyrealsense2>=2.54.1  # Opcional - solo si tienes cámara RealSense
-opencv-python>=4.8.0
-numpy>=1.24.0
+
+# OpenCV y MediaPipe: versiones compatibles con numpy
+opencv-python==4.10.0.84  # Compatible con numpy 1.24-1.26
+numpy>=1.24.0,<2.0.0  # Rango compatible con OpenCV y MediaPipe
 Pillow>=10.0.0
+mediapipe==0.10.9  # Última versión estable compatible con numpy 1.24-1.26
 
 # Tracking
 filterpy>=1.4.5

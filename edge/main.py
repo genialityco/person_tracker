@@ -57,9 +57,11 @@ class EdgeProcessor:
         )
         
         # Gaze estimator (pantalla frente a la cámara)
+        # use_head_pose=True activa MediaPipe para detección precisa de mirada
         self.gaze = GazeEstimator(
             screen_position=(0, 0, 200),  # 2m frente a cámara
-            screen_normal=(0, 0, -1)  # Normal apuntando hacia cámara
+            screen_normal=(0, 0, -1),  # Normal apuntando hacia cámara
+            use_head_pose=True  # ← Activar head pose estimation (recomendado)
         )
         
         # Demographics estimator (edad y género)
@@ -153,11 +155,15 @@ class EdgeProcessor:
                     if distance_cm > settings.max_detection_distance:
                         continue
                 
-                # 4. ESTIMACIÓN DE ATENCIÓN
+                # 4. ESTIMACIÓN DE ATENCIÓN (con head pose si disponible)
                 is_looking = self.gaze.is_looking_at_screen(
+                    frame=color_frame,
+                    bbox=(x1, y1, x2, y2),
                     person_position=position_3d,
                     bbox_center=(cx, cy),
-                    frame_size=(frame_width, frame_height)
+                    frame_size=(frame_width, frame_height),
+                    yaw_threshold=30.0,
+                    pitch_threshold=25.0
                 )
                 
                 # 5. ESTIMACIÓN DE DEMOGRAFÍA (solo una vez por sesión para optimizar)
@@ -178,7 +184,9 @@ class EdgeProcessor:
                     is_looking=is_looking,
                     distance_cm=distance_cm,
                     age_group=age_group if age_group != "unknown" else None,
-                    gender=gender if gender != "unknown" else None
+                    gender=gender if gender != "unknown" else None,
+                    position_x=cx,
+                    position_y=cy
                 )
             
             # 7. PROCESAR SESIONES EXPIRADAS

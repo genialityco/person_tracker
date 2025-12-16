@@ -81,7 +81,7 @@
             "uid": "clickhouse"
           },
           "format": 1,
-          "rawSql": "SELECT ROUND(AVG(attention_seconds / duration_seconds) * 100, 2) AS tpa_percent FROM analytics.sessions_raw_ch WHERE duration_seconds > 0 AND $__conditionalAll(device_id = ${device_id}, $device_id)",
+          "rawSql": "SELECT ROUND(AVG(attention_seconds / duration_seconds) * 100, 2) AS tpa_percent FROM analytics.sessions_raw_ch WHERE duration_seconds > 0 AND $__timeFilter(start_time) AND $__conditionalAll(device_id = ${device_id}, $device_id)",
           "refId": "A"
         }
       ],
@@ -141,7 +141,7 @@
             "uid": "clickhouse"
           },
           "format": 1,
-          "rawSql": "SELECT COUNT(*) AS total_sesiones FROM analytics.sessions_raw_ch WHERE $__conditionalAll(device_id = ${device_id}, $device_id)",
+          "rawSql": "SELECT COUNT(*) AS total_sesiones FROM analytics.sessions_raw_ch WHERE $__timeFilter(start_time) AND $__conditionalAll(device_id = ${device_id}, $device_id)",
           "refId": "A"
         }
       ],
@@ -201,13 +201,133 @@
             "uid": "clickhouse"
           },
           "format": 1,
-          "rawSql": "SELECT ROUND(AVG(duration_seconds), 2) AS dwell_time FROM analytics.sessions_raw_ch WHERE $__conditionalAll(device_id = ${device_id}, $device_id)",
+          "rawSql": "SELECT ROUND(AVG(duration_seconds), 2) AS dwell_time FROM analytics.sessions_raw_ch WHERE $__timeFilter(start_time) AND $__conditionalAll(device_id = ${device_id}, $device_id)",
           "refId": "A"
         }
       ],
       "title": "Permanencia Promedio",
       "type": "stat"
     },
+
+{
+  "datasource": {
+    "type": "grafana-clickhouse-datasource",
+    "uid": "clickhouse"
+  },
+  "fieldConfig": {
+    "defaults": {
+      "custom": {
+        "show": "points",
+        "pointSize": {
+          "fixed": 68
+        },
+        "axisPlacement": "auto",
+        "axisLabel": "",
+        "axisColorMode": "text",
+        "axisBorderShow": false,
+        "scaleDistribution": {
+          "type": "linear"
+        },
+        "axisCenteredZero": false,
+        "hideFrom": {
+          "tooltip": false,
+          "viz": false,
+          "legend": false
+        }
+      },
+      "color": {
+        "mode": "thresholds"
+      },
+      "mappings": [],
+      "thresholds": {
+        "mode": "absolute",
+        "steps": [
+          {
+            "color": "blue",
+            "value": null
+          },
+          {
+            "color": "green",
+            "value": 8
+          },
+          {
+            "color": "yellow",
+            "value": 30
+          },
+          {
+            "color": "orange",
+            "value": 60
+          },
+          {
+            "color": "red",
+            "value": 100
+          }
+        ]
+      },
+      "fieldMinMax": false
+    },
+    "overrides": []
+  },
+  "gridPos": {
+    "h": 12,
+    "w": 24,
+    "x": 0,
+    "y": 42
+  },
+  "id": 11,
+  "options": {
+    "seriesMapping": "manual",
+    "series": [
+      {
+        "x": "x",
+        "y": "y",
+        "color": "density",
+        "size": {
+          "fixed": 15
+        },
+        "pointSize": {
+          "max": 100,
+          "min": 1,
+          "fixed": 50.5
+        },
+        "pointColor": {
+          "field": "density"
+        }
+      }
+    ],
+    "tooltip": {
+      "mode": "single",
+      "sort": "none"
+    },
+    "legend": {
+      "showLegend": false,
+      "displayMode": "list",
+      "placement": "bottom",
+      "calcs": []
+    },
+    "dims": {
+      "exclude": [
+        "density"
+      ]
+    }
+  },
+  "pluginVersion": "10.2.0",
+  "targets": [
+    {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse"
+      },
+      "format": 1,
+      "rawQuery": true,
+      "rawSql": "SELECT\n  floor(coordinate_x / 10) * 10 AS \"x\",\n  floor(coordinate_y / 10) * 10 AS \"y\",\n  count() AS \"density\"\nFROM\n  analytics.sessions_raw_ch\nWHERE\n  $__timeFilter(start_time)\n  AND coordinate_x BETWEEN 0 AND 1000\n  AND coordinate_y BETWEEN 0 AND 1000\nGROUP BY\n  \"x\",\n  \"y\"\nORDER BY\n  \"x\", \"y\"",
+      "refId": "A"
+    }
+  ],
+  "title": "Mapa de Calor - Densidad de Personas por Coordenadas",
+  "transparent": true,
+  "type": "xychart"
+},
     {
       "datasource": {
         "type": "grafana-clickhouse-datasource",
@@ -267,7 +387,7 @@
             "uid": "clickhouse"
           },
           "format": 1,
-          "rawSql": "SELECT ROUND(SUM(CASE WHEN (attention_seconds / duration_seconds) > 0.5 THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) AS porcentaje_alta_atencion FROM analytics.sessions_raw_ch WHERE duration_seconds > 0 AND $__conditionalAll(device_id = ${device_id}, $device_id)",
+          "rawSql": "SELECT ROUND(SUM(CASE WHEN (attention_seconds / duration_seconds) > 0.5 THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) AS porcentaje_alta_atencion FROM analytics.sessions_raw_ch WHERE duration_seconds > 0 AND $__timeFilter(start_time) AND $__conditionalAll(device_id = ${device_id}, $device_id)",
           "refId": "A"
         }
       ],
@@ -353,194 +473,187 @@
             "uid": "clickhouse"
           },
           "format": 0,
-          "rawSql": "SELECT toStartOfHour(start_time) AS time, COUNT(*) AS sesiones FROM analytics.sessions_raw_ch WHERE start_time >= now() - INTERVAL 24 HOUR AND $__conditionalAll(device_id = ${device_id}, $device_id) GROUP BY time ORDER BY time",
+          "rawSql": "SELECT toStartOfHour(start_time) AS time, COUNT(*) AS sesiones FROM analytics.sessions_raw_ch WHERE $__timeFilter(start_time) AND $__conditionalAll(device_id = ${device_id}, $device_id) GROUP BY time ORDER BY time",
           "refId": "A"
         }
       ],
-      "title": "Sesiones por Hora (Últimas 24h)",
+      "title": "Sesiones por Hora",
       "type": "timeseries"
     },
-   {
-  "datasource": {
-    "type": "grafana-clickhouse-datasource",
-    "uid": "clickhouse"
-  },
-  "fieldConfig": {
-    "defaults": {
-
-      "color": {
-        "mode": "palette-classic" 
-      },
-      "custom": {
-        "axisCenteredZero": false,
-        "axisColorMode": "text",
-        "axisLabel": "",
-        "axisPlacement": "auto",
-        "fillOpacity": 80,
-        "gradientMode": "none",
-        "hideFrom": {
-          "tooltip": false,
-          "viz": false,
-          "legend": false
-        },
-        "lineWidth": 1,
-        "scaleDistribution": {
-          "type": "linear"
-        },
-        "thresholdsStyle": {
-          "mode": "off"
-        }
-      },
-      "mappings": [],
-      "thresholds": {
-        "mode": "absolute",
-        "steps": [
-          {
-            "color": "green",
-            "value": null
-          }
-        ]
-      },
-      "unit": "short"
-    },
-    "overrides": []
-  },
-  "gridPos": {
- 
-    "h": 9, 
-    "w": 12,
-    "x": 0,
-    "y": 15
-  },
-  "id": 6,
-  "options": {
-    "barRadius": 0,
-    "barWidth": 0.97,
-    "fullHighlight": false,
-    "groupWidth": 0.7,
-    "legend": {
-      "calcs": [],
-      "displayMode": "list",
-      "placement": "bottom",
-      "showLegend": false
-    },
-    "orientation": "auto",
-    "showValue": "auto",
-    "stacking": "none",
-    "tooltip": {
-      "mode": "single",
-      "sort": "none"
-    },
-    "xTickLabelRotation": 0,
-    "xTickLabelSpacing": 0,
-    "xField": "age_group"
-  },
-  "targets": [
     {
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "clickhouse"
       },
-      "format": 1,
-      "rawSql": "SELECT age_group, COUNT(*) AS sesiones FROM analytics.sessions_raw_ch WHERE $__conditionalAll(device_id = ${device_id}, $device_id) GROUP BY age_group ORDER BY sesiones DESC",
-      "refId": "A"
-    }
-  ],
-  "title": "Distribución de Sesiones por Grupo de Edad",
-  "type": "barchart"
-},
-{
-  "datasource": {
-    "type": "grafana-clickhouse-datasource",
-    "uid": "clickhouse"
-  },
-  "fieldConfig": {
-    "defaults": {
-      "color": {
-        "mode": "palette-classic"
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic" 
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
       },
-      "custom": {
-        "hideFrom": {
-          "tooltip": false,
-          "viz": false,
-          "legend": false
+      "gridPos": {
+        "h": 9, 
+        "w": 12,
+        "x": 0,
+        "y": 15
+      },
+      "id": 6,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
         },
-        "axisCenteredZero": false,
-        "axisColorMode": "text",
-        "axisLabel": "",
-        "axisPlacement": "auto",
-        "fillOpacity": 80,
-        "gradientMode": "none",
-        "lineWidth": 1,
-        "scaleDistribution": {
-          "type": "linear"
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
         },
-        "thresholdsStyle": {
-          "mode": "off"
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0,
+        "xField": "age_group"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "format": 1,
+          "rawSql": "SELECT age_group, COUNT(*) AS sesiones FROM analytics.sessions_raw_ch WHERE $__timeFilter(start_time) AND $__conditionalAll(device_id = ${device_id}, $device_id) GROUP BY age_group ORDER BY sesiones DESC",
+          "refId": "A"
         }
-      },
-      "mappings": [],
-      "thresholds": {
-        "mode": "absolute",
-        "steps": [
-          {
-            "color": "green",
-            "value": null
-          }
-        ]
-      },
-      "unit": "short"
+      ],
+      "title": "Distribución de Sesiones por Grupo de Edad",
+      "type": "barchart"
     },
-    "overrides": []
-  },
-  "gridPos": {
-    
-    "h": 9,
-    "w": 12,
-    "x": 12,
-    "y": 15
-  },
-  "id": 7,
-  "options": {
-    
-    "barRadius": 0,
-    "barWidth": 0.97,
-    "fullHighlight": false,
-    "groupWidth": 0.7,
-    "legend": {
-      "calcs": [],
-      "displayMode": "list",
-      "placement": "bottom",
-      "showLegend": false 
-    },
-    "orientation": "auto",
-    "showValue": "auto",
-    "stacking": "none",
-    "tooltip": {
-      "mode": "single",
-      "sort": "none"
-    },
-    "xTickLabelRotation": 0,
-    "xTickLabelSpacing": 0,
-  
-    "xField": "gender" 
-  },
-  "targets": [
     {
       "datasource": {
         "type": "grafana-clickhouse-datasource",
         "uid": "clickhouse"
       },
-      "format": 1,
-
-      "rawSql": "SELECT gender, COUNT(*) AS sesiones FROM analytics.sessions_raw_ch WHERE $__conditionalAll(device_id = ${device_id}, $device_id) GROUP BY gender ORDER BY sesiones DESC",
-      "refId": "A"
-    }
-  ],
-  "title": "Distribución de Sesiones por Género",
-  
-  "type": "barchart" 
-},
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            },
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 15
+      },
+      "id": 7,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false 
+        },
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0,
+        "xField": "gender" 
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse"
+          },
+          "format": 1,
+          "rawSql": "SELECT gender, COUNT(*) AS sesiones FROM analytics.sessions_raw_ch WHERE $__timeFilter(start_time) AND $__conditionalAll(device_id = ${device_id}, $device_id) GROUP BY gender ORDER BY sesiones DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Distribución de Sesiones por Género",
+      "type": "barchart" 
+    },
     {
       "datasource": {
         "type": "grafana-clickhouse-datasource",
@@ -638,7 +751,7 @@
             "uid": "clickhouse"
           },
           "format": 1,
-          "rawSql": "SELECT age_group AS edad, gender AS genero, COUNT(*) AS sesiones, ROUND(AVG(attention_seconds / duration_seconds) * 100, 2) AS tpa_promedio, ROUND(AVG(duration_seconds), 2) AS permanencia_promedio FROM analytics.sessions_raw_ch WHERE duration_seconds > 0 AND $__conditionalAll(device_id = ${device_id}, $device_id) GROUP BY age_group, gender ORDER BY sesiones DESC",
+          "rawSql": "SELECT age_group AS edad, gender AS genero, COUNT(*) AS sesiones, ROUND(AVG(attention_seconds / duration_seconds) * 100, 2) AS tpa_promedio, ROUND(AVG(duration_seconds), 2) AS permanencia_promedio FROM analytics.sessions_raw_ch WHERE duration_seconds > 0 AND $__timeFilter(start_time) AND $__conditionalAll(device_id = ${device_id}, $device_id) GROUP BY age_group, gender ORDER BY sesiones DESC",
           "refId": "A"
         }
       ],
@@ -725,7 +838,7 @@
             "uid": "clickhouse"
           },
           "format": 1,
-          "rawSql": "SELECT CASE WHEN (attention_seconds / duration_seconds) < 0.25 THEN '0-25%' WHEN (attention_seconds / duration_seconds) < 0.50 THEN '25-50%' WHEN (attention_seconds / duration_seconds) < 0.75 THEN '50-75%' ELSE '75-100%' END AS rango_tpa, COUNT(*) AS sesiones FROM analytics.sessions_raw_ch WHERE duration_seconds > 0 AND $__conditionalAll(device_id = ${device_id}, $device_id) GROUP BY rango_tpa ORDER BY rango_tpa",
+          "rawSql": "SELECT CASE WHEN (attention_seconds / duration_seconds) < 0.25 THEN '0-25%' WHEN (attention_seconds / duration_seconds) < 0.50 THEN '25-50%' WHEN (attention_seconds / duration_seconds) < 0.75 THEN '50-75%' ELSE '75-100%' END AS rango_tpa, COUNT(*) AS sesiones FROM analytics.sessions_raw_ch WHERE duration_seconds > 0 AND $__timeFilter(start_time) AND $__conditionalAll(device_id = ${device_id}, $device_id) GROUP BY rango_tpa ORDER BY rango_tpa",
           "refId": "A"
         }
       ],
@@ -812,7 +925,7 @@
             "uid": "clickhouse"
           },
           "format": 1,
-          "rawSql": "SELECT toHour(start_time) AS hora_del_dia, ROUND(AVG(attention_seconds / duration_seconds) * 100, 2) AS tpa_promedio FROM analytics.sessions_raw_ch WHERE duration_seconds > 0 AND $__conditionalAll(device_id = ${device_id}, $device_id) GROUP BY hora_del_dia ORDER BY tpa_promedio DESC LIMIT 10",
+          "rawSql": "SELECT toHour(start_time) AS hora_del_dia, ROUND(AVG(attention_seconds / duration_seconds) * 100, 2) AS tpa_promedio FROM analytics.sessions_raw_ch WHERE duration_seconds > 0 AND $__timeFilter(start_time) AND $__conditionalAll(device_id = ${device_id}, $device_id) GROUP BY hora_del_dia ORDER BY tpa_promedio DESC LIMIT 10",
           "refId": "A"
         }
       ],
